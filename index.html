@@ -1,0 +1,1795 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>発表会 出欠帳</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    :root {
+      --bg:#EEF0F7; --surface:#FFFFFF; --ink:#211D33; --ink-soft:#6E6982; --ink-faint:#A7A2B6;
+      --line:#E7E5F0; --plum:#3A2C63; --plum-700:#2A1F4C; --plum-soft:#EDE9F6;
+      --amber:#E2872A; --amber-soft:#FBEEDB; --green:#2F9A66; --green-soft:#E2F2EA;
+      --rose:#CF5D78; --rose-soft:#F8E6EB; --shadow:0 10px 34px rgba(33,29,51,.14);
+    }
+    body {
+      font-family:-apple-system,"SF Pro Rounded","Hiragino Maru Gothic ProN",ui-rounded,"Segoe UI",system-ui,sans-serif;
+      color:var(--ink); background:var(--bg); -webkit-font-smoothing:antialiased;
+    }
+    .att-wrap{ max-width:520px; margin:0 auto; padding:22px 16px 120px; }
+    .att-title{ font-size:22px; font-weight:700; letter-spacing:.2px; }
+    .att-sub{ font-size:13px; color:var(--ink-soft); margin-top:3px; }
+    .title-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .gear-btn{ border:0; background:transparent; color:var(--ink-faint); font-size:20px; line-height:1; cursor:pointer; padding:4px 6px; border-radius:8px; }
+    .gear-btn:hover{ color:var(--ink-soft); }
+    .gear-btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .demo-banner{ font-size:12px; font-weight:700; color:#9a5a14; background:var(--amber-soft); border:1px solid #f0d9b6; border-radius:11px; padding:9px 12px; margin-top:14px; line-height:1.5; }
+    .seg{ display:flex; background:var(--plum-soft); border-radius:14px; padding:4px; gap:4px; margin-top:16px; }
+    .seg button{ flex:1; border:0; background:transparent; padding:10px 0; border-radius:11px; font:inherit; font-size:14px; font-weight:600; color:var(--plum); cursor:pointer; transition:background .18s,color .18s; }
+    .seg button.on{ background:var(--surface); color:var(--plum-700); box-shadow:0 1px 3px rgba(33,29,51,.12); }
+    .seg button:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .card{ background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:16px; margin-top:14px; box-shadow:0 1px 2px rgba(33,29,51,.04); }
+    .id-card{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .id-name{ font-size:18px; font-weight:700; margin-top:2px; }
+    .day-date{ font-size:16px; font-weight:700; }
+    .day-label{ font-size:13px; color:var(--ink-soft); margin-top:2px; }
+    .day-time{ font-size:13px; color:var(--plum); font-weight:600; margin-top:2px; }
+    .day-block{ margin-top:10px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+    .day-block:last-of-type{ border-bottom:0; padding-bottom:0; }
+    .time-sep{ font-size:14px; font-weight:700; color:var(--ink-soft); padding:0 2px; flex:0 0 auto; }
+    .me-label{ font-size:13px; color:var(--ink-soft); font-weight:600; }
+    .hint-sm{ font-size:12px; color:var(--ink-soft); margin-top:10px; line-height:1.55; }
+    .choice{ display:flex; gap:8px; margin-top:14px; }
+    .choice button{ flex:1; border:1.5px solid var(--line); background:var(--surface); border-radius:12px; padding:12px 0; font:inherit; font-size:15px; font-weight:700; color:var(--ink-soft); cursor:pointer; transition:all .16s; }
+    .choice button.in-on{ border-color:var(--green); background:var(--green-soft); color:#1f7a4d; }
+    .choice button.out-on{ border-color:var(--rose); background:var(--rose-soft); color:#a83a57; }
+    .choice button:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .opt{ margin-top:14px; display:flex; flex-direction:column; gap:12px; }
+    .opt-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:34px; }
+    .opt-left{ display:flex; align-items:center; gap:11px; }
+    .opt-name{ font-size:14px; font-weight:600; }
+    .switch{ width:48px; height:29px; border-radius:999px; border:0; background:var(--line); position:relative; cursor:pointer; transition:background .18s; flex:0 0 auto; padding:0; }
+    .switch.on{ background:var(--amber); }
+    .switch .knob{ position:absolute; top:3px; left:3px; width:23px; height:23px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.22); transition:left .18s; }
+    .switch.on .knob{ left:22px; }
+    .time-pill{ border:1.5px solid var(--amber); background:var(--amber-soft); color:#9a5a14; border-radius:11px; padding:8px 13px; font:inherit; font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; cursor:pointer; }
+    .time-pill:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .register-btn{ display:block; width:100%; margin-top:18px; border:0; border-radius:14px; padding:16px 0; font:inherit; font-size:16px; font-weight:700; cursor:pointer; transition:all .18s; background:var(--line); color:var(--ink-faint); }
+    .reg-btn{ border:1.5px solid var(--plum); background:var(--plum-soft); color:var(--plum-700); border-radius:12px; padding:12px 24px; font:inherit; font-size:15px; font-weight:700; cursor:pointer; margin-top:10px; transition:all .15s; }
+    .reg-btn:active{ transform:scale(0.97); }
+    .reg-btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .register-btn.active{ background:var(--plum); color:#fff; box-shadow:0 4px 16px rgba(58,44,99,.35); transform:translateY(-1px); }
+    .register-btn.active:active{ transform:scale(0.98) translateY(0); }
+    .register-btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .sum-counts{ display:flex; gap:8px; margin-top:11px; flex-wrap:wrap; }
+    .acc-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .acc-left{ flex:1; min-width:0; }
+    .chevron{ font-size:12px; color:var(--ink-faint); transition:transform .2s ease; margin-top:4px; flex:0 0 auto; }
+    .chevron.open{ transform:rotate(90deg); color:var(--plum); }
+    .filter-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+    .fchip{ border:0; background:var(--plum-soft); color:var(--plum); border-radius:999px; padding:9px 17px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:background .16s, color .16s, transform .12s; }
+    .fchip:not(.on):hover{ background:#E4DCF3; }
+    .fchip.on{ background:var(--plum); color:#fff; box-shadow:0 1px 3px rgba(33,29,51,.18); }
+    .fchip:active{ transform:scale(0.96); }
+    .fchip:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .pill{ font-size:12px; font-weight:700; padding:5px 11px; border-radius:999px; }
+    .pill.g{ background:var(--green-soft); color:#1f7a4d; }
+    .pill.a{ background:var(--amber-soft); color:#9a5a14; }
+    .pill.r{ background:var(--rose-soft); color:#a83a57; }
+    .pill.n{ background:#EFEEF4; color:var(--ink-soft); }
+    .mlist{ margin-top:13px; border-top:1px solid var(--line); }
+    .mrow{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 2px; border-bottom:1px solid var(--line); }
+    .mrow:last-child{ border-bottom:0; }
+    .mname{ display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; }
+    .dot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+    .dot.g{ background:var(--green); } .dot.a{ background:var(--amber); } .dot.r{ background:var(--rose); } .dot.n{ background:var(--ink-faint); }
+    .mval{ font-size:14px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+    .mval.muted{ color:var(--ink-faint); font-weight:600; }
+    .section-h{ font-size:13px; font-weight:700; color:var(--ink-soft); margin:20px 2px 2px; letter-spacing:.3px; }
+    .section-toggle{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:20px 2px 2px; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:6px 0; }
+    .field{ display:flex; gap:8px; align-items:center; margin-top:8px; }
+    form.field{ margin:0; }
+    .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    .code-field{ flex:0 0 80px!important; width:80px; text-align:center; letter-spacing:3px; font-size:16px; font-weight:700; }
+    .code-label{ font-size:12px; color:var(--ink-faint); font-weight:600; flex:1; }
+    .day-edit{ display:flex; gap:8px; align-items:center; margin-top:8px; }
+    .member-edit{ display:flex; gap:8px; align-items:flex-start; margin-top:8px; }
+    .member-inputs{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+    .input{ flex:1; min-width:0; border:1.5px solid var(--line); border-radius:11px; padding:11px 12px; font:inherit; font-size:14px; color:var(--ink); background:var(--surface); }
+    .input:focus{ outline:none; border-color:var(--plum); }
+    .icon-btn{ border:0; background:var(--plum-soft); color:var(--plum-700); border-radius:11px; height:42px; min-width:42px; font-size:15px; font-weight:700; cursor:pointer; flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:0 12px; }
+    .icon-btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .del-btn{ border:0; background:var(--rose-soft); color:#a83a57; border-radius:10px; width:38px; height:38px; font-size:15px; cursor:pointer; flex:0 0 auto; }
+    .note{ font-size:12.5px; color:var(--ink-soft); background:var(--plum-soft); border-radius:13px; padding:12px 13px; margin-top:14px; line-height:1.6; }
+    .note b{ color:var(--plum-700); }
+    .guide-box{ font-size:12px; color:var(--ink-soft); background:var(--plum-soft); border-radius:13px; padding:12px 14px; margin-top:14px; line-height:1.7; }
+    .guide-box b{ display:block; font-size:13px; color:var(--plum-700); margin-bottom:4px; }
+    .danger{ margin-top:22px; }
+    .danger > button{ border:1.5px solid var(--rose); background:transparent; color:#a83a57; border-radius:12px; padding:12px 14px; font:inherit; font-weight:700; cursor:pointer; width:100%; }
+    .empty{ text-align:center; color:var(--ink-soft); padding:30px 12px; font-size:14px; line-height:1.7; }
+    .empty b{ color:var(--ink); }
+    .link-btn{ border:0; background:transparent; color:var(--plum); font:inherit; font-weight:700; cursor:pointer; text-decoration:underline; padding:0; white-space:nowrap; }
+    .sheet-back{ position:fixed; inset:0; background:rgba(20,16,35,.42); display:flex; align-items:flex-end; justify-content:center; z-index:50; animation:fade .2s ease; }
+    .sheet{ width:100%; max-width:520px; background:var(--surface); border-radius:24px 24px 0 0; padding:14px 18px 22px; box-shadow:var(--shadow); animation:rise .26s cubic-bezier(.22,1,.36,1); }
+    .sheet-grab{ width:42px; height:4px; border-radius:2px; background:var(--line); margin:2px auto 12px; }
+    .sheet-title{ text-align:center; font-size:16px; font-weight:700; }
+    .sheet-sub{ text-align:center; font-size:12px; color:var(--ink-soft); margin-top:2px; }
+    .wheels{ display:flex; align-items:center; justify-content:center; gap:6px; margin:6px 0; }
+    .wheel-colon{ font-size:26px; font-weight:700; color:var(--ink); padding-bottom:2px; }
+    .sheet-actions{ display:flex; gap:10px; margin-top:10px; }
+    .btn{ flex:1; border:0; border-radius:13px; padding:14px 0; font:inherit; font-size:15px; font-weight:700; cursor:pointer; }
+    .btn-primary{ background:var(--plum); color:#fff; }
+    .btn-ghost{ background:var(--plum-soft); color:var(--plum-700); }
+    .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+    .wheel{ position:relative; width:86px; height:220px; overflow:hidden; }
+    .wheel.wheel-wide{ width:100%; }
+    .wheel-band{ position:absolute; left:0; right:0; top:88px; height:44px; background:var(--plum-soft); border-radius:10px; pointer-events:none; }
+    .wheel-fade-t,.wheel-fade-b{ position:absolute; left:0; right:0; height:88px; pointer-events:none; z-index:2; }
+    .wheel-fade-t{ top:0; background:linear-gradient(var(--surface), rgba(255,255,255,0)); }
+    .wheel-fade-b{ bottom:0; background:linear-gradient(rgba(255,255,255,0), var(--surface)); }
+    .wheel-scroll{ position:absolute; inset:0; overflow-y:scroll; scroll-snap-type:y mandatory; -webkit-overflow-scrolling:touch; z-index:1; scrollbar-width:none; }
+    .wheel-scroll::-webkit-scrollbar{ display:none; }
+    .wheel-item{ height:44px; display:flex; align-items:center; justify-content:center; scroll-snap-align:center; font-size:20px; font-weight:600; color:var(--ink-faint); font-variant-numeric:tabular-nums; cursor:pointer; transition:color .15s, font-size .15s; }
+    .wheel-item.sel{ color:var(--ink); font-size:25px; }
+    .wheel-wide .wheel-item{ font-size:18px; font-variant-numeric:normal; padding:0 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .wheel-wide .wheel-item.sel{ font-size:21px; }
+    .toast{ position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:var(--plum-700); color:#fff; padding:11px 20px; border-radius:999px; font-size:13px; font-weight:600; z-index:60; box-shadow:var(--shadow); animation:fade .2s ease; }
+    @keyframes rise{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+    @keyframes fade{ from{ opacity:0; } to{ opacity:1; } }
+    @media (prefers-reduced-motion: reduce){ .sheet,.sheet-back,.toast{ animation:none; } }
+  </style>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    window.FIREBASE_CONFIG = {
+      apiKey: "AIzaSyBtH08Go_LYwsdDFeGnSWLLd2hQo-9CAWA",
+      authDomain: "housouken-33b56.firebaseapp.com",
+      projectId: "housouken-33b56",
+      storageBucket: "housouken-33b56.firebasestorage.app",
+      messagingSenderId: "570998763955",
+      appId: "1:570998763955:web:ca0ae502e68b5beab4dbc6"
+    };
+    window.ROOM_ID = "housouken-att-2026-x7q3m9";
+    window.ADMIN_HASH = "00c0a1ea998f762303d1cbecb9fc27d5f996fe148592e3601e975dbea3ead7d8";
+    // ↑ 管理者パスコードの SHA-256 ハッシュ値。パスコード自体はここに書かれません。
+    // パスコードを変更したい場合は、新しいパスコードの SHA-256 ハッシュに置き換えてください。
+    // 現在のパスコード: 
+    window.DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1519675523104768103/7yZnCv9ksZwKtrmuQ_fDuDAnVRw9D28wreFOIzS8Z5JFNUolGmaxN6vO0PH6PUL3vZ31";
+  </script>
+  <script>
+const {
+  useState,
+  useEffect,
+  useRef
+} = React;
+const pad2 = n => String(n).padStart(2, "0");
+const WD = ["日", "月", "火", "水", "木", "金", "土"];
+function formatDate(ds) {
+  if (!ds) return "日付未設定";
+  const p = ds.split("-").map(Number);
+  if (p.length !== 3 || p.some(isNaN)) return ds;
+  return p[1] + "月" + p[2] + "日（" + WD[new Date(p[0], p[1] - 1, p[2]).getDay()] + "）";
+}
+function fmtYMD(d) {
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+function seedRoster() {
+  var t = new Date(),
+    t2 = new Date(t);
+  t2.setDate(t2.getDate() + 7);
+  var b = Date.now();
+  return {
+    people: [],
+    days: [{
+      id: "d" + b,
+      date: fmtYMD(t),
+      label: "第1回 練習",
+      startTime: "18:00",
+      endTime: "20:00"
+    }, {
+      id: "d" + (b + 1),
+      date: fmtYMD(t2),
+      label: "第2回 練習",
+      startTime: "18:00",
+      endTime: "20:00"
+    }]
+  };
+}
+function timeRangeText(day) {
+  var s = day.startTime,
+    e = day.endTime;
+  if (s && e) return s + " 〜 " + e;
+  if (s) return s + " 〜";
+  if (e) return "〜 " + e;
+  return null;
+}
+function cellInfo(d) {
+  if (!d || d.status == null) return {
+    kind: "none",
+    text: "未回答"
+  };
+  if (d.status === "out") return {
+    kind: "absent",
+    text: "欠席"
+  };
+  if (d.arrive && d.leave) return {
+    kind: "partial",
+    text: d.arrive + " 〜 " + d.leave
+  };
+  if (d.arrive) return {
+    kind: "partial",
+    text: d.arrive + " 〜"
+  };
+  if (d.leave) return {
+    kind: "partial",
+    text: "〜 " + d.leave
+  };
+  return {
+    kind: "present",
+    text: "参加"
+  };
+}
+var KIND_CLASS = {
+  present: "g",
+  partial: "a",
+  absent: "r",
+  none: "n"
+};
+function hashStr(str) {
+  var encoder = new TextEncoder();
+  var data = encoder.encode(str);
+  return crypto.subtle.digest("SHA-256", data).then(function (buf) {
+    return Array.from(new Uint8Array(buf)).map(function (b) {
+      return b.toString(16).padStart(2, "0");
+    }).join("");
+  });
+}
+var _notifyCache = {};
+function notifyError(type, detail) {
+  var webhook = window.DISCORD_WEBHOOK || "";
+  if (!webhook || webhook.indexOf("PASTE_") === 0) return;
+  var now = Date.now();
+  if (_notifyCache[type] && now - _notifyCache[type] < 300000) return;
+  _notifyCache[type] = now;
+  var time = new Date().toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo"
+  });
+  var msg = "⚠️ **出欠帳エラー**\n種別: " + type + "\n詳細: " + (detail || "なし") + "\n時刻: " + time;
+  try {
+    fetch(webhook, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        content: msg
+      })
+    }).catch(function () {});
+  } catch (e) {}
+}
+var HOUR_ITEMS = Array.from({
+  length: 24
+}, function (_, i) {
+  return {
+    id: i,
+    label: pad2(i)
+  };
+});
+var MIN_ITEMS = Array.from({
+  length: 60
+}, function (_, i) {
+  return {
+    id: i,
+    label: pad2(i)
+  };
+});
+var Backend = function () {
+  var cfg = window.FIREBASE_CONFIG || {};
+  var room = window.ROOM_ID || "default";
+  var ok = cfg.apiKey && cfg.apiKey.indexOf("PASTE_") !== 0;
+  if (ok && window.firebase) {
+    try {
+      firebase.initializeApp(cfg);
+      var db = firebase.firestore();
+      var base = db.collection("rooms").doc(room);
+      return {
+        mode: "firebase",
+        subscribe: function (onR, onResp) {
+          var u1 = null,
+            u2 = null;
+          var startListeners = function () {
+            u1 = base.collection("meta").doc("roster").onSnapshot(function (d) {
+              onR(d.exists ? d.data() : null);
+            }, function (err) {
+              notifyError("Firestore読込", "roster: " + (err && err.message ? err.message : err));
+              onR(null);
+            });
+            u2 = base.collection("responses").onSnapshot(function (qs) {
+              var o = {};
+              qs.forEach(function (d) {
+                o[d.id] = d.data();
+              });
+              onResp(o);
+            }, function (err) {
+              notifyError("Firestore読込", "responses: " + (err && err.message ? err.message : err));
+              onResp({});
+            });
+          };
+          if (firebase.auth) {
+            firebase.auth().signInAnonymously().then(startListeners).catch(function (err) {
+              notifyError("認証失敗", err && err.message ? err.message : String(err));
+              startListeners();
+            });
+          } else {
+            notifyError("認証未対応", "firebase.auth が見つかりません");
+            startListeners();
+          }
+          return function () {
+            if (u1) try {
+              u1();
+            } catch (e) {}
+            if (u2) try {
+              u2();
+            } catch (e) {}
+          };
+        },
+        saveRoster: function (r) {
+          base.collection("meta").doc("roster").set(r).catch(function (err) {
+            notifyError("Firestore書込", "roster: " + (err && err.message ? err.message : err));
+          });
+        },
+        saveResponse: function (pid, data) {
+          base.collection("responses").doc(pid).set(data).catch(function (err) {
+            notifyError("Firestore書込", "response: " + (err && err.message ? err.message : err));
+          });
+        },
+        deleteResponse: function (pid) {
+          base.collection("responses").doc(pid).delete().catch(function (err) {
+            notifyError("Firestore削除", err && err.message ? err.message : err);
+          });
+        },
+        clearResponses: function () {
+          base.collection("responses").get().then(function (qs) {
+            var batch = db.batch();
+            qs.forEach(function (d) {
+              batch.delete(d.ref);
+            });
+            batch.commit();
+          }).catch(function () {});
+        }
+      };
+    } catch (e) {}
+  }
+  var KEY_R = "att:roster",
+    KEY_RESP = "att:responses";
+  var lg = function (k, d) {
+    try {
+      var v = localStorage.getItem(k);
+      return v ? JSON.parse(v) : d;
+    } catch (e) {
+      return d;
+    }
+  };
+  var ls = function (k, v) {
+    try {
+      localStorage.setItem(k, JSON.stringify(v));
+    } catch (e) {}
+  };
+  return {
+    mode: "demo",
+    subscribe: function (onR, onResp) {
+      onR(lg(KEY_R, null));
+      onResp(lg(KEY_RESP, {}));
+      return function () {};
+    },
+    saveRoster: function (r) {
+      ls(KEY_R, r);
+    },
+    saveResponse: function (pid, data) {
+      var a = lg(KEY_RESP, {});
+      a[pid] = data;
+      ls(KEY_RESP, a);
+    },
+    deleteResponse: function (pid) {
+      var a = lg(KEY_RESP, {});
+      delete a[pid];
+      ls(KEY_RESP, a);
+    },
+    clearResponses: function () {
+      ls(KEY_RESP, {});
+    }
+  };
+}();
+function Wheel(props) {
+  var items = props.items,
+    value = props.value,
+    onChange = props.onChange,
+    wide = props.wide;
+  var ref = useRef(null),
+    tRef = useRef(null),
+    ITEM = 44;
+  var startIdx = Math.max(0, items.findIndex(function (it) {
+    return it.id === value;
+  }));
+  useEffect(function () {
+    if (ref.current) ref.current.scrollTop = startIdx * ITEM;
+  }, []);
+  var handle = function () {
+    if (tRef.current) clearTimeout(tRef.current);
+    tRef.current = setTimeout(function () {
+      var el = ref.current;
+      if (!el) return;
+      var i = Math.round(el.scrollTop / ITEM);
+      i = Math.min(items.length - 1, Math.max(0, i));
+      if (Math.abs(el.scrollTop - i * ITEM) > 1) el.scrollTo({
+        top: i * ITEM
+      });
+      var it = items[i];
+      if (it && it.id !== value) onChange(it.id);
+    }, 110);
+  };
+  var click = function (i) {
+    if (ref.current) ref.current.scrollTo({
+      top: i * ITEM,
+      behavior: "smooth"
+    });
+    onChange(items[i].id);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "wheel" + (wide ? " wheel-wide" : "")
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "wheel-band"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "wheel-fade-t"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "wheel-fade-b"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "wheel-scroll",
+    ref: ref,
+    onScroll: handle
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 88
+    }
+  }), items.map(function (it, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: String(it.id),
+      className: "wheel-item" + (it.id === value ? " sel" : ""),
+      onClick: function () {
+        click(i);
+      }
+    }, it.label);
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 88
+    }
+  })));
+}
+function App() {
+  var _s = useState,
+    _r = useRef;
+  var _view = _s("input"),
+    view = _view[0],
+    setView = _view[1];
+  var _loading = _s(true),
+    loading = _loading[0],
+    setLoading = _loading[1];
+  var _roster = _s({
+      people: [],
+      days: []
+    }),
+    roster = _roster[0],
+    setRoster = _roster[1];
+  var _resp = _s({}),
+    responses = _resp[0],
+    setResponses = _resp[1];
+  var _myEmail = _s(null),
+    myEmail = _myEmail[0],
+    setMyEmail = _myEmail[1];
+  var _emailIn = _s(""),
+    emailInput = _emailIn[0],
+    setEmailInput = _emailIn[1];
+  var _accessCode = _s("0000"),
+    accessCode = _accessCode[0],
+    setAccessCode = _accessCode[1];
+  var _emailErr = _s(""),
+    emailError = _emailErr[0],
+    setEmailError = _emailErr[1];
+  var _regMode = _s(false),
+    regMode = _regMode[0],
+    setRegMode = _regMode[1];
+  var _regName = _s(""),
+    regName = _regName[0],
+    setRegName = _regName[1];
+  var _regEmail = _s(""),
+    regEmail = _regEmail[0],
+    setRegEmail = _regEmail[1];
+  var _regEmailC = _s(""),
+    regEmailConfirm = _regEmailC[0],
+    setRegEmailConfirm = _regEmailC[1];
+  var _regError = _s(""),
+    regError = _regError[0],
+    setRegError = _regError[1];
+  var _me = _s(null),
+    me = _me[0],
+    setMe = _me[1];
+  var _draft = _s({}),
+    myDraft = _draft[0],
+    setMyDraft = _draft[1];
+  var _unsaved = _s(false),
+    unsaved = _unsaved[0],
+    setUnsaved = _unsaved[1];
+  var _sheet = _s(null),
+    sheet = _sheet[0],
+    setSheet = _sheet[1];
+  var _toast = _s(null),
+    toast = _toast[0],
+    setToast = _toast[1];
+  var _filter = _s("all"),
+    filter = _filter[0],
+    setFilter = _filter[1];
+  var _openDays = _s({}),
+    openDays = _openDays[0],
+    setOpenDays = _openDays[1];
+  var _isAdmin = _s(false),
+    isAdmin = _isAdmin[0],
+    setIsAdmin = _isAdmin[1];
+  var _adminP = _s(null),
+    adminPrompt = _adminP[0],
+    setAdminPrompt = _adminP[1];
+  var _newM = _s(""),
+    newMember = _newM[0],
+    setNewMember = _newM[1];
+  var _newE = _s(""),
+    newEmail = _newE[0],
+    setNewEmail = _newE[1];
+  var _cc = _s(false),
+    confirmClear = _cc[0],
+    setConfirmClear = _cc[1];
+  var _newEC = _s(""),
+    newEmailConfirm = _newEC[0],
+    setNewEmailConfirm = _newEC[1];
+  var _memEm = _s({}),
+    memberEmails = _memEm[0],
+    setMemberEmails = _memEm[1];
+  var _settOpen = _s({
+      members: true,
+      days: true
+    }),
+    settingsOpen = _settOpen[0],
+    setSettingsOpen = _settOpen[1];
+  var toastTimer = _r(null),
+    rosterTimer = _r(null),
+    seededRef = _r(false),
+    draftInitRef = _r(null);
+  useEffect(function () {
+    var gotR = false,
+      gotResp = false;
+    var done = function () {
+      if (gotR && gotResp) setLoading(false);
+    };
+    var unsub = Backend.subscribe(function (r) {
+      if (!r) {
+        if (!seededRef.current) {
+          seededRef.current = true;
+          r = seedRoster();
+          Backend.saveRoster(r);
+        } else r = {
+          people: [],
+          days: []
+        };
+      }
+      setRoster(r);
+      gotR = true;
+      done();
+    }, function (resp) {
+      setResponses(resp || {});
+      gotResp = true;
+      done();
+    });
+    try {
+      var params = new URLSearchParams(location.search);
+      var loginEmail = params.get("email");
+      if (loginEmail) {
+        var lem = loginEmail.trim().toLowerCase();
+        try {
+          localStorage.setItem("att:myEmail", lem);
+        } catch (e) {}
+        try {
+          history.replaceState(null, "", location.pathname);
+        } catch (e) {}
+      }
+    } catch (e) {}
+    try {
+      var sv = localStorage.getItem("att:myEmail");
+      setMyEmail(sv || "");
+    } catch (e) {
+      setMyEmail("");
+    }
+    var t = setTimeout(function () {
+      setLoading(false);
+    }, 5000);
+    return function () {
+      clearTimeout(t);
+      try {
+        unsub && unsub();
+      } catch (e) {}
+    };
+  }, []);
+  useEffect(function () {
+    var hash = window.ADMIN_HASH || "";
+    var off = hash === "" || hash.indexOf("PASTE_") === 0;
+    if (off) {
+      setIsAdmin(true);
+      return;
+    }
+    try {
+      if (localStorage.getItem("att:admin") === hash) {
+        setIsAdmin(true);
+        return;
+      }
+    } catch (e) {}
+    try {
+      var p = new URLSearchParams(location.search);
+      var u = p.get("admin");
+      if (u) {
+        hashStr(u).then(function (h) {
+          if (h === hash) {
+            setIsAdmin(true);
+            try {
+              localStorage.setItem("att:admin", hash);
+            } catch (e) {}
+          }
+        });
+      }
+    } catch (e) {}
+  }, []);
+  useEffect(function () {
+    if (!myEmail || roster.people.length === 0) {
+      setMe(null);
+      return;
+    }
+    var match = roster.people.find(function (p) {
+      return p.email && p.email.toLowerCase() === myEmail.toLowerCase();
+    });
+    setMe(match ? match.id : null);
+  }, [myEmail, roster.people]);
+  useEffect(function () {
+    if (me && me !== draftInitRef.current) {
+      draftInitRef.current = me;
+      setMyDraft(Object.assign({}, responses[me] || {}));
+      setUnsaved(false);
+    }
+  }, [me, responses]);
+  function showToast(msg) {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(function () {
+      setToast(null);
+    }, 2000);
+  }
+  function submitEmail() {
+    var em = emailInput.trim().toLowerCase();
+    if (!em || em.indexOf("@") < 0) {
+      setEmailError("メールアドレスを正しく入力してください。");
+      return;
+    }
+    var match = roster.people.find(function (p) {
+      return p.email && p.email.toLowerCase() === em;
+    });
+    if (!match) {
+      setEmailError("このメールアドレスは登録されていません。管理者に連絡してください。");
+      return;
+    }
+    setMyEmail(em);
+    setEmailError("");
+    try {
+      localStorage.setItem("att:myEmail", em);
+    } catch (e) {}
+  }
+  function changeEmail() {
+    setMyEmail("");
+    setMe(null);
+    setEmailInput("");
+    setEmailError("");
+    draftInitRef.current = null;
+    setRegMode(false);
+    setRegName("");
+    setRegEmail("");
+    setRegEmailConfirm("");
+    setRegError("");
+    try {
+      localStorage.removeItem("att:myEmail");
+    } catch (e) {}
+  }
+  function registerSelf() {
+    var nm = regName.trim();
+    var em = regEmail.trim().toLowerCase();
+    var ec = regEmailConfirm.trim().toLowerCase();
+    if (!nm) {
+      setRegError("名前を入力してください。");
+      return;
+    }
+    if (!em || em.indexOf("@") < 0) {
+      setRegError("メールアドレスを正しく入力してください。");
+      return;
+    }
+    if (em !== ec) {
+      setRegError("メールアドレスが一致しません。");
+      return;
+    }
+    var dup = roster.people.find(function (p) {
+      return p.email && p.email.toLowerCase() === em;
+    });
+    if (dup) {
+      setRegError("このメールアドレスは既に登録されています。");
+      return;
+    }
+    var id = "p" + Date.now() + Math.floor(Math.random() * 1000);
+    var next = Object.assign({}, roster, {
+      people: [].concat(roster.people, [{
+        id: id,
+        name: nm,
+        email: em
+      }])
+    });
+    setRoster(next);
+    persistRoster(next);
+    setMyEmail(em);
+    setRegMode(false);
+    setRegError("");
+    setRegName("");
+    setRegEmail("");
+    setRegEmailConfirm("");
+    try {
+      localStorage.setItem("att:myEmail", em);
+    } catch (e) {}
+    showToast("登録しました！");
+  }
+  var persistRoster = function (n) {
+    Backend.saveRoster(n);
+  };
+  var persistRosterDebounced = function (n) {
+    if (rosterTimer.current) clearTimeout(rosterTimer.current);
+    rosterTimer.current = setTimeout(function () {
+      Backend.saveRoster(n);
+    }, 400);
+  };
+  function addPerson(name, email) {
+    var nm = (name || "").trim();
+    if (!nm) return null;
+    var em = (email || "").trim();
+    var ec = (newEmailConfirm || "").trim();
+    if (em && em !== ec) {
+      showToast("メールアドレスが一致しません");
+      return null;
+    }
+    var id = "p" + Date.now() + Math.floor(Math.random() * 1000);
+    var next = Object.assign({}, roster, {
+      people: [].concat(roster.people, [{
+        id: id,
+        name: nm,
+        email: em
+      }])
+    });
+    setRoster(next);
+    persistRoster(next);
+    return id;
+  }
+  function renamePerson(id, name) {
+    var next = Object.assign({}, roster, {
+      people: roster.people.map(function (p) {
+        return p.id === id ? Object.assign({}, p, {
+          name: name
+        }) : p;
+      })
+    });
+    setRoster(next);
+    persistRosterDebounced(next);
+  }
+  function removePerson(id) {
+    var next = Object.assign({}, roster, {
+      people: roster.people.filter(function (p) {
+        return p.id !== id;
+      })
+    });
+    setRoster(next);
+    persistRoster(next);
+    Backend.deleteResponse(id);
+    var nr = Object.assign({}, responses);
+    delete nr[id];
+    setResponses(nr);
+    if (me === id) changeEmail();
+  }
+  function addDay() {
+    var id = "d" + Date.now() + Math.floor(Math.random() * 1000);
+    var next = Object.assign({}, roster, {
+      days: [].concat(roster.days, [{
+        id: id,
+        date: "",
+        label: "",
+        startTime: "",
+        endTime: ""
+      }])
+    });
+    setRoster(next);
+    persistRoster(next);
+  }
+  function updateDay(id, patch) {
+    var next = Object.assign({}, roster, {
+      days: roster.days.map(function (d) {
+        return d.id === id ? Object.assign({}, d, patch) : d;
+      })
+    });
+    setRoster(next);
+    persistRosterDebounced(next);
+  }
+  function removeDay(id) {
+    var next = Object.assign({}, roster, {
+      days: roster.days.filter(function (d) {
+        return d.id !== id;
+      })
+    });
+    setRoster(next);
+    persistRoster(next);
+  }
+  function clearAll() {
+    Backend.clearResponses();
+    var s = seedRoster();
+    Backend.saveRoster(s);
+    setResponses({});
+    setRoster(s);
+    changeEmail();
+    setConfirmClear(false);
+    setView("input");
+    showToast("データを消去しました");
+  }
+  function getME(id) {
+    if (memberEmails[id]) return memberEmails[id];
+    var p = roster.people.find(function (x) {
+      return x.id === id;
+    });
+    var em = p ? p.email || "" : "";
+    return {
+      email: em,
+      confirm: em
+    };
+  }
+  function setME(id, field, value) {
+    var cur = getME(id);
+    var upd = Object.assign({}, cur);
+    upd[field] = value;
+    var nm = Object.assign({}, memberEmails);
+    nm[id] = upd;
+    setMemberEmails(nm);
+    if (upd.email === upd.confirm) {
+      var next = Object.assign({}, roster, {
+        people: roster.people.map(function (p) {
+          return p.id === id ? Object.assign({}, p, {
+            email: upd.email
+          }) : p;
+        })
+      });
+      setRoster(next);
+      persistRosterDebounced(next);
+    }
+  }
+  function toggleSettingsSection(key) {
+    setSettingsOpen(function (prev) {
+      var n = Object.assign({}, prev);
+      n[key] = !prev[key];
+      return n;
+    });
+  }
+  function setDraftStatus(dayId, status) {
+    setMyDraft(function (prev) {
+      var day = Object.assign({}, prev[dayId] || {
+        status: null,
+        arrive: null,
+        leave: null
+      });
+      day.status = status;
+      if (status !== "in") {
+        day.arrive = null;
+        day.leave = null;
+      }
+      var n = Object.assign({}, prev);
+      n[dayId] = day;
+      return n;
+    });
+    setUnsaved(true);
+  }
+  function toggleDraftArrive(dayId, on) {
+    var prevDay = myDraft[dayId] || {};
+    var newVal = on ? prevDay.arrive || "18:00" : null;
+    setMyDraft(function (prev) {
+      var day = Object.assign({}, prev[dayId] || {
+        status: "in",
+        arrive: null,
+        leave: null
+      });
+      day.status = "in";
+      day.arrive = newVal;
+      var n = Object.assign({}, prev);
+      n[dayId] = day;
+      return n;
+    });
+    setUnsaved(true);
+    if (on) setSheet({
+      dayId: dayId,
+      field: "arrive",
+      value: newVal
+    });
+  }
+  function toggleDraftLeave(dayId, on) {
+    var prevDay = myDraft[dayId] || {};
+    var newVal = on ? prevDay.leave || "20:00" : null;
+    setMyDraft(function (prev) {
+      var day = Object.assign({}, prev[dayId] || {
+        status: "in",
+        arrive: null,
+        leave: null
+      });
+      day.status = "in";
+      day.leave = newVal;
+      var n = Object.assign({}, prev);
+      n[dayId] = day;
+      return n;
+    });
+    setUnsaved(true);
+    if (on) setSheet({
+      dayId: dayId,
+      field: "leave",
+      value: newVal
+    });
+  }
+  function openSheet2(dayId, field, fb) {
+    var d = myDraft[dayId] || {};
+    var v = (field === "arrive" ? d.arrive : d.leave) || fb || (field === "arrive" ? "18:00" : "20:00");
+    setSheet({
+      dayId: dayId,
+      field: field,
+      value: v
+    });
+  }
+  function applySheet() {
+    if (!sheet) return;
+    setMyDraft(function (prev) {
+      var day = Object.assign({}, prev[sheet.dayId] || {
+        status: "in",
+        arrive: null,
+        leave: null
+      });
+      day.status = "in";
+      day[sheet.field] = sheet.value;
+      var n = Object.assign({}, prev);
+      n[sheet.dayId] = day;
+      return n;
+    });
+    setUnsaved(true);
+    setSheet(null);
+  }
+  function registerDraft() {
+    if (!me) return;
+    var next = Object.assign({}, responses);
+    next[me] = Object.assign({}, myDraft);
+    setResponses(next);
+    Backend.saveResponse(me, myDraft);
+    setUnsaved(false);
+    showToast("登録しました！");
+  }
+  function submitAdminCode() {
+    var hash = window.ADMIN_HASH || "";
+    if (!adminPrompt || hash === "") return;
+    hashStr(adminPrompt.value).then(function (h) {
+      if (h === hash) {
+        setIsAdmin(true);
+        try {
+          localStorage.setItem("att:admin", hash);
+        } catch (e) {}
+        setAdminPrompt(null);
+        setView("settings");
+      } else {
+        setAdminPrompt(function (p) {
+          return {
+            value: p && p.value || "",
+            error: true
+          };
+        });
+      }
+    });
+  }
+  function lockAdmin() {
+    try {
+      localStorage.removeItem("att:admin");
+    } catch (e) {}
+    setIsAdmin(false);
+    setView("input");
+  }
+  var gateOn = (window.ADMIN_HASH || "").length > 0 && (window.ADMIN_HASH || "").indexOf("PASTE_") !== 0;
+  var myPerson = me ? roster.people.find(function (p) {
+    return p.id === me;
+  }) : null;
+  var myName = myPerson ? myPerson.name : null;
+  if (loading) return /*#__PURE__*/React.createElement("div", {
+    className: "att-wrap"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, "\u8AAD\u307F\u8FBC\u307F\u4E2D\u2026"));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "att-wrap"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "title-row"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "att-title"
+  }, "\u767A\u8868\u4F1A \u51FA\u6B20\u5E33"), /*#__PURE__*/React.createElement("div", {
+    className: "att-sub"
+  }, "\u7DF4\u7FD2\u65E5\u3054\u3068\u306B\u3001\u53C2\u52A0\u30FB\u9045\u523B\u30FB\u65E9\u9000\u3092\u307E\u3068\u3081\u3066\u5171\u6709")), !isAdmin && gateOn && /*#__PURE__*/React.createElement("button", {
+    className: "gear-btn",
+    "aria-label": "\u7BA1\u7406\u8005",
+    onClick: function () {
+      setAdminPrompt({
+        value: "",
+        error: false
+      });
+    }
+  }, "\u2699")), Backend.mode === "demo" && /*#__PURE__*/React.createElement("div", {
+    className: "demo-banner"
+  }, "\u30C7\u30E2\u30E2\u30FC\u30C9\uFF1AFirebase \u672A\u8A2D\u5B9A\u306E\u305F\u3081\u3001\u30C7\u30FC\u30BF\u306F\u4FDD\u5B58\u30FB\u5171\u6709\u3055\u308C\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("div", {
+    className: "seg"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: view === "input" ? "on" : "",
+    onClick: function () {
+      setView("input");
+    }
+  }, "\u5165\u529B"), /*#__PURE__*/React.createElement("button", {
+    className: view === "summary" ? "on" : "",
+    onClick: function () {
+      setView("summary");
+    }
+  }, "\u51FA\u6B20\u78BA\u8A8D"), isAdmin && /*#__PURE__*/React.createElement("button", {
+    className: view === "settings" ? "on" : "",
+    onClick: function () {
+      setView("settings");
+    }
+  }, "\u8A2D\u5B9A")), view === "input" && /*#__PURE__*/React.createElement(React.Fragment, null, !myEmail && !regMode && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "guide-box"
+  }, /*#__PURE__*/React.createElement("b", null, "\u306F\u3058\u3081\u3066\u306E\u65B9\u3078"), "Teams \u30E1\u30F3\u30D0\u30FC\u306F\u7BA1\u7406\u8005\u304C\u767B\u9332\u6E08\u307F\u3067\u3059\u3002\u5B66\u6821\u306E\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3092\u5165\u529B\u3057\u3066\u30ED\u30B0\u30A4\u30F3\u3057\u3066\u304F\u3060\u3055\u3044\u3002Teams \u306B\u53C2\u52A0\u3057\u3066\u3044\u306A\u3044\u65B9\u306F\u300C\u65B0\u898F\u767B\u9332\u300D\u304B\u3089\u767B\u9332\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "me-label"
+  }, "\u5B66\u6821\u306E\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3067\u30ED\u30B0\u30A4\u30F3"), /*#__PURE__*/React.createElement("form", {
+    style: {
+      marginTop: 12
+    },
+    method: "GET",
+    action: "",
+    onSubmit: function (e) {
+      var em = emailInput.trim().toLowerCase();
+      if (!em || em.indexOf("@") < 0) {
+        e.preventDefault();
+        setEmailError("メールアドレスを正しく入力してください。");
+        return;
+      }
+      var match = roster.people.find(function (p) {
+        return p.email && p.email.toLowerCase() === em;
+      });
+      if (!match) {
+        e.preventDefault();
+        setEmailError("このメールアドレスは登録されていません。管理者に連絡してください。");
+        return;
+      }
+      if (accessCode !== "0000") {
+        e.preventDefault();
+        setEmailError("確認コードが正しくありません。");
+        return;
+      }
+      try {
+        localStorage.setItem("att:myEmail", em);
+      } catch (e2) {}
+    },
+    autoComplete: "on"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "email",
+    name: "email",
+    autoComplete: "username",
+    placeholder: "example@\u25CB\u25CB.ac.jp",
+    value: emailInput,
+    onChange: function (e) {
+      setEmailInput(e.target.value);
+      setEmailError("");
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field",
+    style: {
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input code-field",
+    type: "password",
+    name: "p",
+    autoComplete: "current-password",
+    value: accessCode,
+    onChange: function (e) {
+      setAccessCode(e.target.value);
+      setEmailError("");
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "code-label"
+  }, "\u78BA\u8A8D\u30B3\u30FC\u30C9"), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    type: "submit"
+  }, "\u2192")), /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      marginTop: 4
+    }
+  }, "\u78BA\u8A8D\u30B3\u30FC\u30C9\u306F\u305D\u306E\u307E\u307E\u3067OK\u3067\u3059\u3002\u5909\u66F4\u306E\u5FC5\u8981\u306F\u3042\u308A\u307E\u305B\u3093\u3002"), emailError && /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      color: "#a83a57"
+    }
+  }, emailError))), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      marginTop: 0
+    }
+  }, "Teams \u306B\u53C2\u52A0\u3057\u3066\u3044\u306A\u3044\u65B9"), /*#__PURE__*/React.createElement("button", {
+    className: "reg-btn",
+    onClick: function () {
+      setRegMode(true);
+      setRegEmail(emailInput);
+    }
+  }, "\u65B0\u898F\u767B\u9332"))), !myEmail && regMode && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "me-label"
+  }, "\u65B0\u898F\u767B\u9332"), /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      marginTop: 4
+    }
+  }, "\u540D\u524D\u3068\u5B66\u6821\u306E\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3092\u767B\u9332\u3059\u308B\u3068\u3001\u6B21\u56DE\u4EE5\u964D\u306F\u81EA\u52D5\u3067\u30ED\u30B0\u30A4\u30F3\u3067\u304D\u307E\u3059\u3002"), /*#__PURE__*/React.createElement("div", {
+    className: "member-inputs",
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    placeholder: "\u540D\u524D\uFF08\u30D5\u30EB\u30CD\u30FC\u30E0\uFF09",
+    value: regName,
+    onChange: function (e) {
+      setRegName(e.target.value);
+      setRegError("");
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "email",
+    placeholder: "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9",
+    value: regEmail,
+    onChange: function (e) {
+      setRegEmail(e.target.value);
+      setRegError("");
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "email",
+    placeholder: "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\uFF08\u78BA\u8A8D\uFF09",
+    value: regEmailConfirm,
+    onChange: function (e) {
+      setRegEmailConfirm(e.target.value);
+      setRegError("");
+    }
+  }), regEmail && regEmailConfirm && regEmail.toLowerCase() !== regEmailConfirm.toLowerCase() && /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      color: "#a83a57"
+    }
+  }, "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u304C\u4E00\u81F4\u3057\u3066\u3044\u307E\u305B\u3093"), regError && /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      color: "#a83a57"
+    }
+  }, regError)), /*#__PURE__*/React.createElement("div", {
+    className: "field",
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    style: {
+      flex: 1
+    },
+    onClick: function () {
+      setRegMode(false);
+      setRegError("");
+    }
+  }, "\u623B\u308B"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      flex: 1
+    },
+    onClick: registerSelf
+  }, "\u767B\u9332\u3057\u3066\u30ED\u30B0\u30A4\u30F3"))), myEmail && !me && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      color: "#a83a57",
+      marginTop: 0
+    }
+  }, "\u300C", myEmail, "\u300D\u306F\u540D\u7C3F\u306B\u767B\u9332\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("div", {
+    className: "field",
+    style: {
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    style: {
+      flex: 1
+    },
+    onClick: changeEmail
+  }, "\u5225\u306E\u30E1\u30FC\u30EB\u3067\u8A66\u3059"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      flex: 1
+    },
+    onClick: function () {
+      setRegMode(true);
+      setRegEmail(myEmail);
+      setRegEmailConfirm("");
+      setMyEmail("");
+    }
+  }, "\u65B0\u898F\u767B\u9332\u3059\u308B"))), me && myName && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "card id-card"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "me-label"
+  }, "\u30ED\u30B0\u30A4\u30F3\u4E2D"), /*#__PURE__*/React.createElement("div", {
+    className: "id-name"
+  }, myName)), /*#__PURE__*/React.createElement("button", {
+    className: "link-btn",
+    onClick: changeEmail
+  }, "\u5909\u66F4")), roster.days.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, "\u7DF4\u7FD2\u65E5\u304C\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002"), roster.days.map(function (day) {
+    var d = myDraft[day.id] || {
+      status: null,
+      arrive: null,
+      leave: null
+    };
+    var isIn = d.status === "in",
+      isOut = d.status === "out";
+    return /*#__PURE__*/React.createElement("div", {
+      className: "card",
+      key: day.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "day-date"
+    }, formatDate(day.date)), day.label && /*#__PURE__*/React.createElement("div", {
+      className: "day-label"
+    }, day.label), timeRangeText(day) && /*#__PURE__*/React.createElement("div", {
+      className: "day-time"
+    }, timeRangeText(day)), /*#__PURE__*/React.createElement("div", {
+      className: "choice"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: isIn ? "in-on" : "",
+      onClick: function () {
+        setDraftStatus(day.id, "in");
+      }
+    }, "\u53C2\u52A0"), /*#__PURE__*/React.createElement("button", {
+      className: isOut ? "out-on" : "",
+      onClick: function () {
+        setDraftStatus(day.id, "out");
+      }
+    }, "\u6B20\u5E2D")), isIn && /*#__PURE__*/React.createElement("div", {
+      className: "opt"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "opt-row"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "opt-left"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "switch" + (d.arrive ? " on" : ""),
+      onClick: function () {
+        toggleDraftArrive(day.id, !d.arrive);
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "knob"
+    })), /*#__PURE__*/React.createElement("span", {
+      className: "opt-name"
+    }, "\u9045\u308C\u3066\u53C2\u52A0")), d.arrive && /*#__PURE__*/React.createElement("button", {
+      className: "time-pill",
+      onClick: function () {
+        openSheet2(day.id, "arrive", d.arrive);
+      }
+    }, d.arrive, " \u306B\u5230\u7740")), /*#__PURE__*/React.createElement("div", {
+      className: "opt-row"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "opt-left"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "switch" + (d.leave ? " on" : ""),
+      onClick: function () {
+        toggleDraftLeave(day.id, !d.leave);
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "knob"
+    })), /*#__PURE__*/React.createElement("span", {
+      className: "opt-name"
+    }, "\u9014\u4E2D\u3067\u9000\u51FA")), d.leave && /*#__PURE__*/React.createElement("button", {
+      className: "time-pill",
+      onClick: function () {
+        openSheet2(day.id, "leave", d.leave);
+      }
+    }, d.leave, " \u306B\u9000\u51FA"))));
+  }), roster.days.length > 0 && /*#__PURE__*/React.createElement("button", {
+    className: "register-btn" + (unsaved ? " active" : ""),
+    disabled: !unsaved,
+    onClick: registerDraft
+  }, unsaved ? "登録する" : "登録済み ✓"))), view === "summary" && /*#__PURE__*/React.createElement(React.Fragment, null, roster.days.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, "\u7DF4\u7FD2\u65E5\u304C\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002"), roster.days.length > 0 && roster.people.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, "\u30E1\u30F3\u30D0\u30FC\u304C\u3044\u307E\u305B\u3093\u3002", /*#__PURE__*/React.createElement("br", null), "\u300C\u8A2D\u5B9A\u300D\u304B\u3089\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002"), roster.days.length > 0 && roster.people.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "filter-row"
+  }, [["all", "すべて"], ["in", "参加"], ["out", "欠席"], ["none", "未回答"]].map(function (pair) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: pair[0],
+      className: "fchip" + (filter === pair[0] ? " on" : ""),
+      onClick: function () {
+        setFilter(pair[0]);
+      }
+    }, pair[1]);
+  })), roster.days.length > 0 && roster.people.length > 0 && roster.days.map(function (day) {
+    var counts = roster.people.reduce(function (acc, p) {
+      var k = cellInfo(responses[p.id] && responses[p.id][day.id]).kind;
+      if (k === "present" || k === "partial") acc.attend++;else if (k === "absent") acc.absent++;else acc.none++;
+      return acc;
+    }, {
+      attend: 0,
+      absent: 0,
+      none: 0
+    });
+    var vis = roster.people.filter(function (p) {
+      if (filter === "all") return true;
+      var k = cellInfo(responses[p.id] && responses[p.id][day.id]).kind;
+      if (filter === "in") return k === "present" || k === "partial";
+      if (filter === "out") return k === "absent";
+      return k === "none";
+    });
+    var isOpen = !!openDays[day.id];
+    var toggle = function () {
+      setOpenDays(function (prev) {
+        var n = Object.assign({}, prev);
+        n[day.id] = !prev[day.id];
+        return n;
+      });
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      className: "card",
+      key: day.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "acc-header",
+      onClick: toggle
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "acc-left"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "day-date"
+    }, formatDate(day.date)), day.label && /*#__PURE__*/React.createElement("div", {
+      className: "day-label"
+    }, day.label), timeRangeText(day) && /*#__PURE__*/React.createElement("div", {
+      className: "day-time"
+    }, timeRangeText(day)), /*#__PURE__*/React.createElement("div", {
+      className: "sum-counts"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "pill g"
+    }, "\u53C2\u52A0 ", counts.attend), counts.absent > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "pill r"
+    }, "\u6B20\u5E2D ", counts.absent), counts.none > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "pill n"
+    }, "\u672A\u56DE\u7B54 ", counts.none))), /*#__PURE__*/React.createElement("span", {
+      className: "chevron" + (isOpen ? " open" : "")
+    }, "\u25B6")), isOpen && (vis.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      className: "hint-sm",
+      style: {
+        marginTop: 12
+      }
+    }, "\u8A72\u5F53\u8005\u306A\u3057") : /*#__PURE__*/React.createElement("div", {
+      className: "mlist"
+    }, vis.map(function (p) {
+      var info = cellInfo(responses[p.id] && responses[p.id][day.id]);
+      return /*#__PURE__*/React.createElement("div", {
+        className: "mrow",
+        key: p.id
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "mname"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "dot " + KIND_CLASS[info.kind]
+      }), p.name), /*#__PURE__*/React.createElement("span", {
+        className: "mval" + (info.kind === "none" ? " muted" : "")
+      }, info.text));
+    }))));
+  })), view === "settings" && isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "note"
+  }, "\u30E1\u30F3\u30D0\u30FC\u306E\u540D\u524D\u3068\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3067\u672C\u4EBA\u3092\u5224\u5225\u3057\u307E\u3059\u3002\u30C7\u30FC\u30BF\u306F\u5171\u6709\u5148\u3092\u958B\u3044\u305F\u5168\u54E1\u306B\u8868\u793A\u3055\u308C\u307E\u3059\u3002"), gateOn && /*#__PURE__*/React.createElement("div", {
+    className: "field",
+    style: {
+      justifyContent: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "link-btn",
+    onClick: lockAdmin
+  }, "\u7BA1\u7406\u8005\u30E2\u30FC\u30C9\u3092\u30ED\u30C3\u30AF\u3059\u308B")), /*#__PURE__*/React.createElement("div", {
+    className: "section-toggle",
+    onClick: function () {
+      toggleSettingsSection("members");
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "section-h",
+    style: {
+      margin: 0
+    }
+  }, "\u30E1\u30F3\u30D0\u30FC\uFF08\u540D\u524D\u30FB\u30E1\u30FC\u30EB\uFF09"), /*#__PURE__*/React.createElement("span", {
+    className: "chevron" + (settingsOpen.members ? " open" : "")
+  }, "\u25B6")), settingsOpen.members && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, roster.people.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, "\u307E\u3060\u30E1\u30F3\u30D0\u30FC\u304C\u3044\u307E\u305B\u3093\u3002"), roster.people.map(function (p) {
+    var me2 = getME(p.id);
+    var match = me2.email === me2.confirm;
+    var bothEmpty = !me2.email && !me2.confirm;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "member-edit",
+      key: p.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "member-inputs"
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      placeholder: "\u540D\u524D",
+      value: p.name,
+      onChange: function (e) {
+        renamePerson(p.id, e.target.value);
+      }
+    }), /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      type: "email",
+      placeholder: "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9",
+      value: me2.email,
+      onChange: function (e) {
+        setME(p.id, "email", e.target.value);
+      }
+    }), /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      type: "email",
+      placeholder: "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\uFF08\u78BA\u8A8D\uFF09",
+      value: me2.confirm,
+      onChange: function (e) {
+        setME(p.id, "confirm", e.target.value);
+      }
+    }), !bothEmpty && !match && /*#__PURE__*/React.createElement("div", {
+      className: "hint-sm",
+      style: {
+        color: "#a83a57"
+      }
+    }, "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u304C\u4E00\u81F4\u3057\u3066\u3044\u307E\u305B\u3093"), !bothEmpty && match && me2.email && /*#__PURE__*/React.createElement("div", {
+      className: "hint-sm",
+      style: {
+        color: "#2F9A66"
+      }
+    }, "\u2713 \u4E00\u81F4")), /*#__PURE__*/React.createElement("button", {
+      className: "del-btn",
+      "aria-label": "\u524A\u9664",
+      onClick: function () {
+        removePerson(p.id);
+      }
+    }, "\u2715"));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "member-edit",
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "member-inputs"
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    placeholder: "\u65B0\u3057\u3044\u30E1\u30F3\u30D0\u30FC\u306E\u540D\u524D",
+    value: newMember,
+    onChange: function (e) {
+      setNewMember(e.target.value);
+    },
+    onKeyDown: function (e) {
+      if (e.key === "Enter") {
+        if (addPerson(newMember, newEmail)) {
+          setNewMember("");
+          setNewEmail("");
+          setNewEmailConfirm("");
+        }
+      }
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "email",
+    placeholder: "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9",
+    value: newEmail,
+    onChange: function (e) {
+      setNewEmail(e.target.value);
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "email",
+    placeholder: "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\uFF08\u78BA\u8A8D\uFF09",
+    value: newEmailConfirm,
+    onChange: function (e) {
+      setNewEmailConfirm(e.target.value);
+    }
+  }), newEmail && newEmailConfirm && newEmail !== newEmailConfirm && /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      color: "#a83a57"
+    }
+  }, "\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u304C\u4E00\u81F4\u3057\u3066\u3044\u307E\u305B\u3093")), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    "aria-label": "\u8FFD\u52A0",
+    onClick: function () {
+      if (addPerson(newMember, newEmail)) {
+        setNewMember("");
+        setNewEmail("");
+        setNewEmailConfirm("");
+      }
+    }
+  }, "\uFF0B"))), /*#__PURE__*/React.createElement("div", {
+    className: "section-toggle",
+    onClick: function () {
+      toggleSettingsSection("days");
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "section-h",
+    style: {
+      margin: 0
+    }
+  }, "\u7DF4\u7FD2\u65E5"), /*#__PURE__*/React.createElement("span", {
+    className: "chevron" + (settingsOpen.days ? " open" : "")
+  }, "\u25B6")), settingsOpen.days && /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, roster.days.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty"
+  }, "\u7DF4\u7FD2\u65E5\u304C\u3042\u308A\u307E\u305B\u3093\u3002"), roster.days.map(function (d) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "day-block",
+      key: d.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "day-edit"
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      type: "date",
+      value: d.date,
+      style: {
+        flex: "0 0 auto",
+        width: 150
+      },
+      onChange: function (e) {
+        updateDay(d.id, {
+          date: e.target.value
+        });
+      }
+    }), /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      placeholder: "\u30E9\u30D9\u30EB\uFF08\u4EFB\u610F\uFF09",
+      value: d.label,
+      onChange: function (e) {
+        updateDay(d.id, {
+          label: e.target.value
+        });
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      className: "del-btn",
+      "aria-label": "\u524A\u9664",
+      onClick: function () {
+        removeDay(d.id);
+      }
+    }, "\u2715")), /*#__PURE__*/React.createElement("div", {
+      className: "day-edit",
+      style: {
+        marginTop: 4
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      type: "time",
+      value: d.startTime || "",
+      style: {
+        flex: "0 0 auto",
+        width: 120
+      },
+      onChange: function (e) {
+        updateDay(d.id, {
+          startTime: e.target.value
+        });
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "time-sep"
+    }, "\u301C"), /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      type: "time",
+      value: d.endTime || "",
+      style: {
+        flex: "0 0 auto",
+        width: 120
+      },
+      onChange: function (e) {
+        updateDay(d.id, {
+          endTime: e.target.value
+        });
+      }
+    })));
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    style: {
+      width: "100%",
+      marginTop: 12
+    },
+    onClick: addDay
+  }, "\uFF0B \u7DF4\u7FD2\u65E5\u3092\u8FFD\u52A0")), /*#__PURE__*/React.createElement("div", {
+    className: "danger"
+  }, !confirmClear ? /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setConfirmClear(true);
+    }
+  }, "\u3059\u3079\u3066\u306E\u30C7\u30FC\u30BF\u3092\u6D88\u53BB") : /*#__PURE__*/React.createElement("div", {
+    className: "field"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "del-btn",
+    style: {
+      width: "auto",
+      flex: 1,
+      height: 44
+    },
+    onClick: clearAll
+  }, "\u672C\u5F53\u306B\u6D88\u53BB\u3059\u308B"), /*#__PURE__*/React.createElement("button", {
+    className: "icon-btn",
+    style: {
+      flex: 1
+    },
+    onClick: function () {
+      setConfirmClear(false);
+    }
+  }, "\u3084\u3081\u308B")))), sheet && /*#__PURE__*/React.createElement("div", {
+    className: "sheet-back",
+    onClick: function () {
+      setSheet(null);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    onClick: function (e) {
+      e.stopPropagation();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-grab"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-title"
+  }, sheet.field === "arrive" ? "到着する時刻" : "退出する時刻"), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-sub"
+  }, function () {
+    var d = roster.days.find(function (x) {
+      return x.id === sheet.dayId;
+    });
+    return d ? formatDate(d.date) : "";
+  }()), /*#__PURE__*/React.createElement("div", {
+    className: "wheels",
+    key: sheet.dayId + sheet.field
+  }, /*#__PURE__*/React.createElement(Wheel, {
+    items: HOUR_ITEMS,
+    value: Number(sheet.value.split(":")[0]),
+    onChange: function (nh) {
+      setSheet(function (s) {
+        return Object.assign({}, s, {
+          value: pad2(nh) + ":" + s.value.split(":")[1]
+        });
+      });
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "wheel-colon"
+  }, ":"), /*#__PURE__*/React.createElement(Wheel, {
+    items: MIN_ITEMS,
+    value: Number(sheet.value.split(":")[1]),
+    onChange: function (nm) {
+      setSheet(function (s) {
+        return Object.assign({}, s, {
+          value: s.value.split(":")[0] + ":" + pad2(nm)
+        });
+      });
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: function () {
+      setSheet(null);
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: applySheet
+  }, "\u5B8C\u4E86")))), adminPrompt && /*#__PURE__*/React.createElement("div", {
+    className: "sheet-back",
+    onClick: function () {
+      setAdminPrompt(null);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    onClick: function (e) {
+      e.stopPropagation();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-grab"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-title"
+  }, "\u7BA1\u7406\u8005\u30D1\u30B9\u30B3\u30FC\u30C9"), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-sub"
+  }, "\u300C\u8A2D\u5B9A\u300D\u3092\u958B\u304F\u306B\u306F\u30D1\u30B9\u30B3\u30FC\u30C9\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "input",
+    type: "password",
+    autoFocus: true,
+    placeholder: "\u30D1\u30B9\u30B3\u30FC\u30C9",
+    value: adminPrompt.value,
+    onChange: function (e) {
+      setAdminPrompt({
+        value: e.target.value,
+        error: false
+      });
+    },
+    onKeyDown: function (e) {
+      if (e.key === "Enter") submitAdminCode();
+    },
+    style: {
+      width: "100%"
+    }
+  }), adminPrompt.error && /*#__PURE__*/React.createElement("div", {
+    className: "hint-sm",
+    style: {
+      color: "#a83a57"
+    }
+  }, "\u30D1\u30B9\u30B3\u30FC\u30C9\u304C\u9055\u3044\u307E\u3059\u3002")), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-actions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: function () {
+      setAdminPrompt(null);
+    }
+  }, "\u30AD\u30E3\u30F3\u30BB\u30EB"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    onClick: submitAdminCode
+  }, "\u89E3\u9664")))), toast && /*#__PURE__*/React.createElement("div", {
+    className: "toast"
+  }, toast));
+}
+try {
+  var root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(/*#__PURE__*/React.createElement(App, null));
+} catch (e) {
+  notifyError("アプリ起動エラー", e && e.message ? e.message : String(e));
+  var el = document.getElementById("root");
+  if (el) {
+    el.textContent = "読み込みエラー: " + (e && e.message ? e.message : e);
+    el.setAttribute("style", "padding:24px;font-family:-apple-system,system-ui,sans-serif;color:#211D33;line-height:1.7");
+  }
+}
+  </script>
+  <script>setTimeout(function(){var r=document.getElementById("root");if(r&&r.childElementCount===0){r.textContent="読み込みに時間がかかっています。ページを再読み込みしてください。";r.setAttribute("style","padding:24px;font-family:-apple-system,system-ui,sans-serif;color:#6E6982;line-height:1.7");}},7000);</script>
+</body>
+</html>
