@@ -25,6 +25,7 @@
     .gear-btn:hover{ color:var(--ink-soft); }
     .gear-btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
     .demo-banner{ font-size:12px; font-weight:700; color:#9a5a14; background:var(--amber-soft); border:1px solid #f0d9b6; border-radius:11px; padding:9px 12px; margin-top:14px; line-height:1.5; }
+    .error-banner{ font-size:12px; font-weight:700; color:#a83a57; background:var(--rose-soft); border:1px solid #e8b8c4; border-radius:11px; padding:9px 12px; margin-top:14px; line-height:1.5; }
     .seg{ display:flex; background:var(--plum-soft); border-radius:14px; padding:4px; gap:4px; margin-top:16px; }
     .seg button{ flex:1; border:0; background:transparent; padding:10px 0; border-radius:11px; font:inherit; font-size:14px; font-weight:600; color:var(--plum); cursor:pointer; transition:background .18s,color .18s; }
     .seg button.on{ background:var(--surface); color:var(--plum-700); box-shadow:0 1px 3px rgba(33,29,51,.12); }
@@ -160,7 +161,7 @@
     window.ADMIN_HASH = "00c0a1ea998f762303d1cbecb9fc27d5f996fe148592e3601e975dbea3ead7d8";
     // ↑ 管理者パスコードの SHA-256 ハッシュ値。パスコード自体はここに書かれません。
     // パスコードを変更したい場合は、新しいパスコードの SHA-256 ハッシュに置き換えてください。
-    // 現在のパスコード: 
+    // 現在のパスコード:
     window.DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1519675523104768103/7yZnCv9ksZwKtrmuQ_fDuDAnVRw9D28wreFOIzS8Z5JFNUolGmaxN6vO0PH6PUL3vZ31";
   </script>
   <script>
@@ -309,7 +310,7 @@ var Backend = function () {
               onR(d.exists ? d.data() : null);
             }, function (err) {
               notifyError("Firestore読込", "roster: " + (err && err.message ? err.message : err));
-              onR(null);
+              onR(false);
             });
             u2 = base.collection("responses").onSnapshot(function (qs) {
               var o = {};
@@ -319,7 +320,7 @@ var Backend = function () {
               onResp(o);
             }, function (err) {
               notifyError("Firestore読込", "responses: " + (err && err.message ? err.message : err));
-              onResp({});
+              onResp(false);
             });
           };
           if (firebase.auth) {
@@ -362,10 +363,14 @@ var Backend = function () {
               batch.delete(d.ref);
             });
             batch.commit();
-          }).catch(function () {});
+          }).catch(function (err) {
+            notifyError("Firestore削除", "clearResponses: " + (err && err.message ? err.message : err));
+          });
         }
       };
-    } catch (e) {}
+    } catch (e) {
+      notifyError("Firebase初期化失敗", e && e.message ? e.message : String(e));
+    }
   }
   var KEY_R = "att:roster",
     KEY_RESP = "att:responses";
@@ -481,6 +486,9 @@ function App() {
   var _loading = _s(true),
     loading = _loading[0],
     setLoading = _loading[1];
+  var _loadErr = _s(false),
+    loadError = _loadErr[0],
+    setLoadError = _loadErr[1];
   var _roster = _s({
       people: [],
       days: []
@@ -576,6 +584,12 @@ function App() {
       if (gotR && gotResp) setLoading(false);
     };
     var unsub = Backend.subscribe(function (r) {
+      if (r === false) {
+        setLoadError(true);
+        gotR = true;
+        done();
+        return;
+      }
       if (!r) {
         if (!seededRef.current) {
           seededRef.current = true;
@@ -590,6 +604,12 @@ function App() {
       gotR = true;
       done();
     }, function (resp) {
+      if (resp === false) {
+        setLoadError(true);
+        gotResp = true;
+        done();
+        return;
+      }
       setResponses(resp || {});
       gotResp = true;
       done();
@@ -1042,7 +1062,9 @@ function App() {
     }
   }, "\u2699")), Backend.mode === "demo" && /*#__PURE__*/React.createElement("div", {
     className: "demo-banner"
-  }, "\u30C7\u30E2\u30E2\u30FC\u30C9\uFF1AFirebase \u672A\u8A2D\u5B9A\u306E\u305F\u3081\u3001\u30C7\u30FC\u30BF\u306F\u4FDD\u5B58\u30FB\u5171\u6709\u3055\u308C\u307E\u305B\u3093\u3002"), /*#__PURE__*/React.createElement("div", {
+  }, "\u30C7\u30E2\u30E2\u30FC\u30C9\uFF1AFirebase \u672A\u8A2D\u5B9A\u306E\u305F\u3081\u3001\u30C7\u30FC\u30BF\u306F\u4FDD\u5B58\u30FB\u5171\u6709\u3055\u308C\u307E\u305B\u3093\u3002"), loadError && /*#__PURE__*/React.createElement("div", {
+    className: "error-banner"
+  }, "\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u901A\u4FE1\u74B0\u5883\u3092\u78BA\u8A8D\u3057\u3066\u30DA\u30FC\u30B8\u3092\u518D\u8AAD\u307F\u8FBC\u307F\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u7BA1\u7406\u8005\u306B\u9023\u7D61\u3057\u3066\u304F\u3060\u3055\u3044\u3002"), /*#__PURE__*/React.createElement("div", {
     className: "seg"
   }, /*#__PURE__*/React.createElement("button", {
     className: view === "input" ? "on" : "",
@@ -1426,9 +1448,16 @@ function App() {
   }, "\u30E1\u30F3\u30D0\u30FC\u306E\u540D\u524D\u3068\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3067\u672C\u4EBA\u3092\u5224\u5225\u3057\u307E\u3059\u3002\u30C7\u30FC\u30BF\u306F\u5171\u6709\u5148\u3092\u958B\u3044\u305F\u5168\u54E1\u306B\u8868\u793A\u3055\u308C\u307E\u3059\u3002"), gateOn && /*#__PURE__*/React.createElement("div", {
     className: "field",
     style: {
-      justifyContent: "flex-end"
+      justifyContent: "flex-end",
+      gap: 12
     }
   }, /*#__PURE__*/React.createElement("button", {
+    className: "link-btn",
+    onClick: function () {
+      notifyError("テスト通知_" + Date.now(), "管理者画面からのテスト送信です。この通知が届いていれば正常に動作しています。");
+      showToast("テスト通知を送信しました");
+    }
+  }, "\u901A\u77E5\u30C6\u30B9\u30C8"), /*#__PURE__*/React.createElement("button", {
     className: "link-btn",
     onClick: lockAdmin
   }, "\u7BA1\u7406\u8005\u30E2\u30FC\u30C9\u3092\u30ED\u30C3\u30AF\u3059\u308B")), /*#__PURE__*/React.createElement("div", {
