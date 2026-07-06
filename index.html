@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>発表会 出欠帳</title>
+  <title>練習出欠表</title>
   <style>
 * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
@@ -246,14 +246,98 @@ var EMPTY_NG = {
   weekdays: [],
   dates: []
 };
-// その練習日が本人の固定NG（毎週の曜日 or 特定日）に当たるかを判定
-function ngMatches(ng, day) {
-  if (!ng || !day || !day.date) return false;
+// 旧形式（数値/文字列の配列）の _ng を時間帯付きの新形式に揃える
+// 新形式: weekdays: [{wd:0-6, start:"HH:MM"|null, end:"HH:MM"|null}], dates: [{date:"YYYY-MM-DD", start, end}]
+function normNg(ng) {
+  if (!ng) return EMPTY_NG;
+  return {
+    weekdays: (ng.weekdays || []).map(function (x) {
+      return typeof x === "number" ? {
+        wd: x,
+        start: null,
+        end: null
+      } : x;
+    }),
+    dates: (ng.dates || []).map(function (x) {
+      return typeof x === "string" ? {
+        date: x,
+        start: null,
+        end: null
+      } : x;
+    })
+  };
+}
+// その練習日に当たるNG設定（曜日・特定日）をすべて集める
+function ngEntriesForDay(ng, day) {
+  if (!ng || !day || !day.date) return [];
+  var found = [];
+  (ng.dates || []).forEach(function (e) {
+    if (e.date === day.date) found.push(e);
+  });
   var p = day.date.split("-").map(Number);
-  if (p.length !== 3 || p.some(isNaN)) return false;
-  if (ng.dates && ng.dates.indexOf(day.date) >= 0) return true;
-  var wd = new Date(p[0], p[1] - 1, p[2]).getDay();
-  return !!(ng.weekdays && ng.weekdays.indexOf(wd) >= 0);
+  if (p.length === 3 && !p.some(isNaN)) {
+    var wd = new Date(p[0], p[1] - 1, p[2]).getDay();
+    (ng.weekdays || []).forEach(function (e) {
+      if (e.wd === wd) found.push(e);
+    });
+  }
+  return found;
+}
+// NG設定がその練習日に与える影響を計算する
+// 戻り値: null（影響なし） / {kind:"out"}（欠席） /
+//         {kind:"partial", arrive, leave}（遅刻・早退） /
+//         {kind:"hint"}（時間帯NGだが練習時間が未設定で判定不能）
+function ngEffectForDay(ng, day) {
+  var entries = ngEntriesForDay(ng, day);
+  if (!entries.length) return null;
+  var allDay = entries.some(function (e) {
+    return !e.start && !e.end;
+  });
+  if (allDay) return {
+    kind: "out"
+  };
+  var ps = day.startTime,
+    pe = day.endTime;
+  if (!ps || !pe) return {
+    kind: "hint"
+  };
+  var arrive = null,
+    leave = null,
+    out = false;
+  entries.forEach(function (e) {
+    // "HH:MM" はゼロ埋めのため文字列比較で時刻の大小を判定できる
+    var ns = e.start || "00:00",
+      ne = e.end || "24:00";
+    if (ne <= ps || ns >= pe) return; // 練習時間と重ならない
+    var coversStart = ns <= ps,
+      coversEnd = ne >= pe;
+    if (coversStart && coversEnd) {
+      out = true; // 練習全体を覆う → 欠席
+      return;
+    }
+    if (coversStart) {
+      if (!arrive || ne > arrive) arrive = ne; // 前半がNG → 遅刻
+    } else if (coversEnd) {
+      if (!leave || ns < leave) leave = ns; // 後半がNG → 早退
+    } else if (!leave || ns < leave) leave = ns; // 中抜けNG → 早退扱い（前半のみ参加）
+  });
+  if (out) return {
+    kind: "out"
+  };
+  if (!arrive && !leave) return null;
+  if (arrive && leave && leave <= arrive) return {
+    kind: "out"
+  };
+  return {
+    kind: "partial",
+    arrive: arrive,
+    leave: leave
+  };
+}
+// NG時間帯の表示用テキスト
+function ngTimeText(e) {
+  if (!e.start && !e.end) return "終日";
+  return (e.start || "") + " 〜 " + (e.end || "");
 }
 function hashStr(str) {
   var encoder = new TextEncoder();
@@ -274,7 +358,7 @@ function notifyError(type, detail) {
   var time = new Date().toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo"
   });
-  var msg = "⚠️ **出欠帳エラー**\n種別: " + type + "\n詳細: " + (detail || "なし") + "\n時刻: " + time;
+  var msg = "⚠️ **練習出欠表エラー**\n種別: " + type + "\n詳細: " + (detail || "なし") + "\n時刻: " + time;
   try {
     fetch(webhook, {
       method: "POST",
@@ -634,6 +718,9 @@ function App() {
   var _ngDate = _s(""),
     ngDateInput = _ngDate[0],
     setNgDateInput = _ngDate[1];
+  var _ngOpen = _s({}),
+    ngOpen = _ngOpen[0],
+    setNgOpen = _ngOpen[1];
   var toastTimer = _r(null),
     rosterTimer = _r(null),
     seededRef = _r(false),
@@ -751,25 +838,60 @@ function App() {
     //   再登録時に他の日の回答を消してしまうため）
     if (me === draftInitRef.current && unsaved) return;
     var fresh = Object.assign({}, responses[me] || {});
-    var ng = fresh._ng || null;
+    var ng = normNg(fresh._ng);
     delete fresh._ng;
-    // 固定NG日と重なる未回答の練習日は「欠席」を選択済みにしておく
-    // （保存自体は本人が「登録する」を押したときに行う）
-    var prefilled = false;
+    // 固定NG設定を練習日に自動反映し、そのまま保存する（_auto フラグ付き）。
+    // 本人が手動で登録した回答（_auto なし）には触れない。
+    // NG設定が外れた日は、自動登録した分だけを未回答に戻す。
+    var auto = {};
+    var today = fmtYMD(new Date());
     roster.days.forEach(function (day) {
+      if (day.date && day.date < today) return; // 終わった練習の記録は変更しない
       var cur = fresh[day.id];
-      if ((!cur || cur.status == null) && ngMatches(ng, day)) {
-        fresh[day.id] = {
+      var isAuto = !!(cur && cur._auto);
+      if (cur && cur.status != null && !isAuto) return;
+      var eff = ngEffectForDay(ng, day);
+      var next2 = null;
+      if (!eff || eff.kind === "hint") {
+        if (isAuto && cur.status != null) next2 = {
+          status: null,
+          arrive: null,
+          leave: null,
+          _auto: true
+        };
+      } else if (eff.kind === "out") {
+        next2 = {
           status: "out",
           arrive: null,
-          leave: null
+          leave: null,
+          _auto: true
         };
-        prefilled = true;
+      } else {
+        next2 = {
+          status: "in",
+          arrive: eff.arrive || null,
+          leave: eff.leave || null,
+          _auto: true
+        };
       }
+      if (!next2) return;
+      // 変化がなければ保存しない（保存→再実行の無限ループ防止）
+      if (cur && cur.status === next2.status && (cur.arrive || null) === next2.arrive && (cur.leave || null) === next2.leave) return;
+      fresh[day.id] = next2;
+      auto[day.id] = next2;
     });
     draftInitRef.current = me;
     setMyDraft(fresh);
-    setUnsaved(prefilled);
+    setUnsaved(false);
+    if (Object.keys(auto).length) {
+      Backend.saveResponse(me, auto);
+      setResponses(function (prev) {
+        var n = Object.assign({}, prev);
+        n[me] = Object.assign({}, prev[me] || {}, auto);
+        return n;
+      });
+      showToast("NG設定を出欠に自動反映しました");
+    }
   }, [me, responses, roster.days, unsaved]);
   function showToast(msg) {
     setToast(msg);
@@ -982,6 +1104,7 @@ function App() {
         arrive: null,
         leave: null
       });
+      delete day._auto; // 手動操作 → 以後は自動反映で上書きしない
       day.status = status;
       if (status !== "in") {
         day.arrive = null;
@@ -1002,6 +1125,7 @@ function App() {
         arrive: null,
         leave: null
       });
+      delete day._auto; // 手動操作 → 以後は自動反映で上書きしない
       day.status = "in";
       day.arrive = newVal;
       var n = Object.assign({}, prev);
@@ -1024,6 +1148,7 @@ function App() {
         arrive: null,
         leave: null
       });
+      delete day._auto; // 手動操作 → 以後は自動反映で上書きしない
       day.status = "in";
       day.leave = newVal;
       var n = Object.assign({}, prev);
@@ -1054,6 +1179,7 @@ function App() {
         arrive: null,
         leave: null
       });
+      delete day._auto; // 手動操作 → 以後は自動反映で上書きしない
       day.status = "in";
       day[sheet.field] = sheet.value;
       var n = Object.assign({}, prev);
@@ -1073,7 +1199,7 @@ function App() {
     setUnsaved(false);
     showToast("登録しました！");
   }
-  var myNg = me && responses[me] && responses[me]._ng ? responses[me]._ng : EMPTY_NG;
+  var myNg = normNg(me && responses[me] ? responses[me]._ng : null);
   function saveNg(ng) {
     if (!me) return;
     var next = Object.assign({}, responses);
@@ -1085,9 +1211,29 @@ function App() {
   }
   function toggleNgWeekday(wd) {
     var list = (myNg.weekdays || []).slice();
-    var i = list.indexOf(wd);
-    if (i >= 0) list.splice(i, 1);else list.push(wd);
-    list.sort();
+    var i = list.findIndex(function (e) {
+      return e.wd === wd;
+    });
+    if (i >= 0) list.splice(i, 1);else list.push({
+      wd: wd,
+      start: null,
+      end: null
+    });
+    list.sort(function (a, b) {
+      return a.wd - b.wd;
+    });
+    saveNg({
+      weekdays: list,
+      dates: (myNg.dates || []).slice()
+    });
+  }
+  function setNgWeekdayTime(wd, field, value) {
+    var list = (myNg.weekdays || []).map(function (e) {
+      if (e.wd !== wd) return e;
+      var u = Object.assign({}, e);
+      u[field] = value || null;
+      return u;
+    });
     saveNg({
       weekdays: list,
       dates: (myNg.dates || []).slice()
@@ -1096,8 +1242,16 @@ function App() {
   function addNgDate() {
     if (!ngDateInput) return;
     var list = (myNg.dates || []).slice();
-    if (list.indexOf(ngDateInput) < 0) list.push(ngDateInput);
-    list.sort();
+    if (!list.some(function (e) {
+      return e.date === ngDateInput;
+    })) list.push({
+      date: ngDateInput,
+      start: null,
+      end: null
+    });
+    list.sort(function (a, b) {
+      return a.date < b.date ? -1 : 1;
+    });
     saveNg({
       weekdays: (myNg.weekdays || []).slice(),
       dates: list
@@ -1105,13 +1259,74 @@ function App() {
     setNgDateInput("");
     showToast("NG日を追加しました");
   }
+  function setNgDateTime(dateStr, field, value) {
+    var list = (myNg.dates || []).map(function (e) {
+      if (e.date !== dateStr) return e;
+      var u = Object.assign({}, e);
+      u[field] = value || null;
+      return u;
+    });
+    saveNg({
+      weekdays: (myNg.weekdays || []).slice(),
+      dates: list
+    });
+  }
   function removeNgDate(dateStr) {
     saveNg({
       weekdays: (myNg.weekdays || []).slice(),
-      dates: (myNg.dates || []).filter(function (x) {
-        return x !== dateStr;
+      dates: (myNg.dates || []).filter(function (e) {
+        return e.date !== dateStr;
       })
     });
+  }
+  function toggleNgOpen(key) {
+    setNgOpen(function (prev) {
+      var n = Object.assign({}, prev);
+      n[key] = !prev[key];
+      return n;
+    });
+  }
+  // NG曜日・NG日の「詳細」で開く時間帯エディタ（共通）
+  function ngTimeEditor(entry, onTime) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "4px 2px 12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "day-edit",
+      style: {
+        marginTop: 0
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      type: "time",
+      value: entry.start || "",
+      style: {
+        flex: "0 0 auto",
+        width: 120
+      },
+      onChange: function (ev) {
+        onTime("start", ev.target.value);
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "time-sep"
+    }, "〜"), /*#__PURE__*/React.createElement("input", {
+      className: "input",
+      type: "time",
+      value: entry.end || "",
+      style: {
+        flex: "0 0 auto",
+        width: 120
+      },
+      onChange: function (ev) {
+        onTime("end", ev.target.value);
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "hint-sm",
+      style: {
+        marginTop: 6
+      }
+    }, "NGの時間帯を指定できます。片方だけの指定もOK、両方空欄なら終日NGです。練習時間と比べて遅刻・早退・欠席を自動判定します。"));
   }
   function submitAdminCode() {
     var hash = window.ADMIN_HASH || "";
@@ -1142,6 +1357,15 @@ function App() {
     setView("input");
   }
   var gateOn = (window.ADMIN_HASH || "").length > 0 && (window.ADMIN_HASH || "").indexOf("PASTE_") !== 0;
+  // 練習日の翌日以降は一般画面（入力・出欠確認）から自動で非表示にする。
+  // 過去分は管理者の設定画面「過去の練習日」から確認できる。日付未設定の日は表示側に残す。
+  var todayYMD = fmtYMD(new Date());
+  var visibleDays = roster.days.filter(function (d) {
+    return !d.date || d.date >= todayYMD;
+  });
+  var pastDays = roster.days.filter(function (d) {
+    return d.date && d.date < todayYMD;
+  });
   var myPerson = me ? roster.people.find(function (p) {
     return p.id === me;
   }) : null;
@@ -1157,7 +1381,7 @@ function App() {
     className: "title-row"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "att-title"
-  }, "\u767A\u8868\u4F1A \u51FA\u6B20\u5E33"), /*#__PURE__*/React.createElement("div", {
+  }, "\u7DF4\u7FD2\u51FA\u6B20\u8868"), /*#__PURE__*/React.createElement("div", {
     className: "att-sub"
   }, "\u7DF4\u7FD2\u65E5\u3054\u3068\u306B\u3001\u53C2\u52A0\u30FB\u9045\u523B\u30FB\u65E9\u9000\u3092\u307E\u3068\u3081\u3066\u5171\u6709")), !isAdmin && gateOn && /*#__PURE__*/React.createElement("button", {
     className: "gear-btn",
@@ -1399,9 +1623,9 @@ function App() {
   }, myName)), /*#__PURE__*/React.createElement("button", {
     className: "link-btn",
     onClick: changeEmail
-  }, "\u5909\u66F4")), roster.days.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u30ED\u30B0\u30A2\u30A6\u30C8")), visibleDays.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty"
-  }, "\u7DF4\u7FD2\u65E5\u304C\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002"), roster.days.map(function (day) {
+  }, "\u4E88\u5B9A\u3055\u308C\u3066\u3044\u308B\u7DF4\u7FD2\u65E5\u306F\u3042\u308A\u307E\u305B\u3093\u3002"), visibleDays.map(function (day) {
     var d = myDraft[day.id] || {
       status: null,
       arrive: null,
@@ -1409,6 +1633,7 @@ function App() {
     };
     var isIn = d.status === "in",
       isOut = d.status === "out";
+    var ngEff = ngEffectForDay(myNg, day);
     return /*#__PURE__*/React.createElement("div", {
       className: "card",
       key: day.id
@@ -1418,13 +1643,13 @@ function App() {
       className: "day-label"
     }, day.label), timeRangeText(day) && /*#__PURE__*/React.createElement("div", {
       className: "day-time"
-    }, timeRangeText(day)), ngMatches(myNg, day) && /*#__PURE__*/React.createElement("div", {
+    }, timeRangeText(day)), ngEff && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 8
       }
     }, /*#__PURE__*/React.createElement("span", {
-      className: "pill r"
-    }, "マイページで登録したNG日です")), /*#__PURE__*/React.createElement("div", {
+      className: "pill " + (ngEff.kind === "hint" ? "a" : "r")
+    }, ngEff.kind === "out" ? "NG日（欠席を自動登録）" : ngEff.kind === "partial" ? "NG時間帯（遅刻・早退を自動反映）" : "NG時間帯あり（練習時間が未設定のため自動反映されません）")), /*#__PURE__*/React.createElement("div", {
       className: "choice"
     }, /*#__PURE__*/React.createElement("button", {
       className: isIn ? "in-on" : "",
@@ -1475,15 +1700,15 @@ function App() {
         openSheet2(day.id, "leave", d.leave);
       }
     }, d.leave, " \u306B\u9000\u51FA"))));
-  }), roster.days.length > 0 && /*#__PURE__*/React.createElement("button", {
+  }), visibleDays.length > 0 && /*#__PURE__*/React.createElement("button", {
     className: "register-btn" + (unsaved ? " active" : ""),
     disabled: !unsaved,
     onClick: registerDraft
-  }, unsaved ? "登録する" : "登録済み ✓"))), view === "summary" && (me || isAdmin) && /*#__PURE__*/React.createElement(React.Fragment, null, roster.days.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, unsaved ? "登録する" : "登録済み ✓"))), view === "summary" && (me || isAdmin) && /*#__PURE__*/React.createElement(React.Fragment, null, visibleDays.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty"
-  }, "\u7DF4\u7FD2\u65E5\u304C\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002"), roster.days.length > 0 && roster.people.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u4E88\u5B9A\u3055\u308C\u3066\u3044\u308B\u7DF4\u7FD2\u65E5\u306F\u3042\u308A\u307E\u305B\u3093\u3002"), visibleDays.length > 0 && roster.people.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty"
-  }, "\u30E1\u30F3\u30D0\u30FC\u304C\u3044\u307E\u305B\u3093\u3002", /*#__PURE__*/React.createElement("br", null), "\u300C\u8A2D\u5B9A\u300D\u304B\u3089\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002"), roster.days.length > 0 && roster.people.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\u30E1\u30F3\u30D0\u30FC\u304C\u3044\u307E\u305B\u3093\u3002", /*#__PURE__*/React.createElement("br", null), "\u300C\u8A2D\u5B9A\u300D\u304B\u3089\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002"), visibleDays.length > 0 && roster.people.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "filter-row"
   }, [["all", "すべて"], ["in", "参加"], ["out", "欠席"], ["none", "未回答"]].map(function (pair) {
     return /*#__PURE__*/React.createElement("button", {
@@ -1493,7 +1718,7 @@ function App() {
         setFilter(pair[0]);
       }
     }, pair[1]);
-  })), roster.days.length > 0 && roster.people.length > 0 && roster.days.map(function (day) {
+  })), visibleDays.length > 0 && roster.people.length > 0 && visibleDays.map(function (day) {
     var counts = roster.people.reduce(function (acc, p) {
       var k = cellInfo(responses[p.id] && responses[p.id][day.id]).kind;
       if (k === "present" || k === "partial") acc.attend++;else if (k === "absent") acc.absent++;else acc.none++;
@@ -1551,8 +1776,9 @@ function App() {
       className: "mlist"
     }, vis.map(function (p) {
       var info = cellInfo(responses[p.id] && responses[p.id][day.id]);
-      // 未回答でも固定NG日に当たる場合はその旨を表示する（本人が確定するまでは未回答扱い）
-      if (info.kind === "none" && ngMatches(responses[p.id] && responses[p.id]._ng, day)) {
+      // 未回答でも固定NG日に当たる場合はその旨を表示する
+      // （本人が一度アプリを開けば自動反映されるが、開くまでは未回答のまま残るため）
+      if (info.kind === "none" && ngEffectForDay(normNg(responses[p.id] && responses[p.id]._ng), day)) {
         info = {
           kind: "none",
           text: "未回答（NG日）"
@@ -1578,18 +1804,20 @@ function App() {
   }, myName)), /*#__PURE__*/React.createElement("button", {
     className: "link-btn",
     onClick: changeEmail
-  }, "変更")), /*#__PURE__*/React.createElement("div", {
+  }, "ログアウト")), /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "me-label"
   }, "固定NG日（バイト・授業など）"), /*#__PURE__*/React.createElement("div", {
     className: "hint-sm"
-  }, "毎週の予定や決まっている用事を登録しておくと、その日と重なる練習日には自動で「欠席」が選ばれます（「入力」画面の「登録する」ボタンで確定）。あとから練習日が追加された場合にも自動で反映されます。"), /*#__PURE__*/React.createElement("div", {
+  }, "バイトや授業など、固定で参加できない予定を登録しておくと、重なる練習日の出欠が自動で登録されます（あとから練習日が追加された場合も反映）。「詳細」から時間帯を指定すると、練習時間と比べて遅刻・早退・欠席を自動で判定します。自分で選び直した日はそのまま優先されます。"), /*#__PURE__*/React.createElement("div", {
     className: "section-h"
   }, "毎週のNG曜日"), /*#__PURE__*/React.createElement("div", {
     className: "filter-row"
   }, WD.map(function (w, i) {
-    var on = (myNg.weekdays || []).indexOf(i) >= 0;
+    var on = (myNg.weekdays || []).some(function (e) {
+      return e.wd === i;
+    });
     return /*#__PURE__*/React.createElement("button", {
       key: i,
       className: "fchip" + (on ? " on" : ""),
@@ -1597,6 +1825,32 @@ function App() {
         toggleNgWeekday(i);
       }
     }, w);
+  })), (myNg.weekdays || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mlist"
+  }, (myNg.weekdays || []).map(function (e) {
+    var key = "w" + e.wd;
+    return /*#__PURE__*/React.createElement("div", {
+      key: key
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "mrow"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "mname"
+    }, "毎週" + WD[e.wd] + "曜日"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "mval" + (!e.start && !e.end ? " muted" : "")
+    }, ngTimeText(e)), /*#__PURE__*/React.createElement("button", {
+      className: "link-btn",
+      onClick: function () {
+        toggleNgOpen(key);
+      }
+    }, ngOpen[key] ? "閉じる" : "詳細"))), ngOpen[key] && ngTimeEditor(e, function (field, v) {
+      setNgWeekdayTime(e.wd, field, v);
+    }));
   })), /*#__PURE__*/React.createElement("div", {
     className: "section-h"
   }, "特定のNG日"), /*#__PURE__*/React.createElement("div", {
@@ -1614,19 +1868,36 @@ function App() {
     onClick: addNgDate
   }, "＋")), (myNg.dates || []).length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "mlist"
-  }, (myNg.dates || []).map(function (ds) {
+  }, (myNg.dates || []).map(function (e) {
+    var key = "d" + e.date;
     return /*#__PURE__*/React.createElement("div", {
-      className: "mrow",
-      key: ds
+      key: key
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "mrow"
     }, /*#__PURE__*/React.createElement("span", {
       className: "mname"
-    }, formatDate(ds)), /*#__PURE__*/React.createElement("button", {
+    }, formatDate(e.date)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "mval" + (!e.start && !e.end ? " muted" : "")
+    }, ngTimeText(e)), /*#__PURE__*/React.createElement("button", {
+      className: "link-btn",
+      onClick: function () {
+        toggleNgOpen(key);
+      }
+    }, ngOpen[key] ? "閉じる" : "詳細"), /*#__PURE__*/React.createElement("button", {
       className: "del-btn",
       "aria-label": "削除",
       onClick: function () {
-        removeNgDate(ds);
+        removeNgDate(e.date);
       }
-    }, "✕"));
+    }, "✕"))), ngOpen[key] && ngTimeEditor(e, function (field, v) {
+      setNgDateTime(e.date, field, v);
+    }));
   })))), view === "settings" && isAdmin && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "note"
   }, "\u30E1\u30F3\u30D0\u30FC\u306E\u540D\u524D\u3068\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u30E1\u30FC\u30EB\u30A2\u30C9\u30EC\u30B9\u3067\u672C\u4EBA\u3092\u5224\u5225\u3057\u307E\u3059\u3002\u30C7\u30FC\u30BF\u306F\u5171\u6709\u5148\u3092\u958B\u3044\u305F\u5168\u54E1\u306B\u8868\u793A\u3055\u308C\u307E\u3059\u3002"), gateOn && /*#__PURE__*/React.createElement("div", {
@@ -1777,9 +2048,9 @@ function App() {
     className: "chevron" + (settingsOpen.days ? " open" : "")
   }, "\u25B6")), settingsOpen.days && /*#__PURE__*/React.createElement("div", {
     className: "card"
-  }, roster.days.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, visibleDays.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty"
-  }, "\u7DF4\u7FD2\u65E5\u304C\u3042\u308A\u307E\u305B\u3093\u3002"), roster.days.map(function (d) {
+  }, "\u4E88\u5B9A\u3055\u308C\u3066\u3044\u308B\u7DF4\u7FD2\u65E5\u306F\u3042\u308A\u307E\u305B\u3093\u3002"), visibleDays.map(function (d) {
     return /*#__PURE__*/React.createElement("div", {
       className: "day-block",
       key: d.id
@@ -1854,7 +2125,79 @@ function App() {
       marginTop: 12
     },
     onClick: addDay
-  }, "\uFF0B \u7DF4\u7FD2\u65E5\u3092\u8FFD\u52A0")), /*#__PURE__*/React.createElement("div", {
+  }, "\uFF0B \u7DF4\u7FD2\u65E5\u3092\u8FFD\u52A0"), pastDays.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "section-toggle",
+    style: {
+      margin: "18px 0 0"
+    },
+    onClick: function () {
+      toggleSettingsSection("pastDays");
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "section-h",
+    style: {
+      margin: 0
+    }
+  }, "\u904E\u53BB\u306E\u7DF4\u7FD2\u65E5\uFF08" + pastDays.length + "\u4EF6\uFF09"), /*#__PURE__*/React.createElement("span", {
+    className: "chevron" + (settingsOpen.pastDays ? " open" : "")
+  }, "\u25B6")), settingsOpen.pastDays && pastDays.map(function (day) {
+    var counts = roster.people.reduce(function (acc, p) {
+      var k = cellInfo(responses[p.id] && responses[p.id][day.id]).kind;
+      if (k === "present" || k === "partial") acc.attend++;else if (k === "absent") acc.absent++;else acc.none++;
+      return acc;
+    }, {
+      attend: 0,
+      absent: 0,
+      none: 0
+    });
+    var isOpen = !!openDays[day.id];
+    var toggle = function () {
+      setOpenDays(function (prev) {
+        var n = Object.assign({}, prev);
+        n[day.id] = !prev[day.id];
+        return n;
+      });
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      className: "day-block",
+      key: day.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "acc-header",
+      onClick: toggle
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "acc-left"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "day-date"
+    }, formatDate(day.date)), day.label && /*#__PURE__*/React.createElement("div", {
+      className: "day-label"
+    }, day.label), timeRangeText(day) && /*#__PURE__*/React.createElement("div", {
+      className: "day-time"
+    }, timeRangeText(day)), /*#__PURE__*/React.createElement("div", {
+      className: "sum-counts"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "pill g"
+    }, "\u53C2\u52A0 ", counts.attend), counts.absent > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "pill r"
+    }, "\u6B20\u5E2D ", counts.absent), counts.none > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "pill n"
+    }, "\u672A\u56DE\u7B54 ", counts.none))), /*#__PURE__*/React.createElement("span", {
+      className: "chevron" + (isOpen ? " open" : "")
+    }, "\u25B6")), isOpen && /*#__PURE__*/React.createElement("div", {
+      className: "mlist"
+    }, roster.people.map(function (p) {
+      var info = cellInfo(responses[p.id] && responses[p.id][day.id]);
+      return /*#__PURE__*/React.createElement("div", {
+        className: "mrow",
+        key: p.id
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "mname"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "dot " + KIND_CLASS[info.kind]
+      }), p.name), /*#__PURE__*/React.createElement("span", {
+        className: "mval" + (info.kind === "none" ? " muted" : "")
+      }, info.text));
+    })));
+  })), /*#__PURE__*/React.createElement("div", {
     className: "danger"
   }, !confirmClear ? /*#__PURE__*/React.createElement("button", {
     onClick: function () {
